@@ -1,0 +1,57 @@
+https://kubernetes.io/docs/reference/access-authn-authz/admission-controllers/
+Un contrôleur d'admission est un morceau de code qui intercepte les demandes adressées au serveur API de Kubernetes avant la persistance de l'objet, 
+mais après l'authentification et l'autorisation de la demande. Les contrôleurs se composent de la liste ci-dessous, sont compilés dans le binaire kube-apiserver
+et ne peuvent être configurés que par l'administrateur du cluster. Dans cette liste, il y a deux contrôleurs spéciaux : MutatingAdmissionWebhook et
+ValidatingAdmissionWebhook. Ils exécutent les webhooks de contrôle d'admission mutant et validant (respectivement) qui sont configurés dans l'API.
+
+Pourquoi en ai-je besoin ?
+De nombreuses fonctionnalités avancées de Kubernetes nécessitent qu'un contrôleur d'admission soit activé afin de prendre correctement en charge la fonctionnalité.
+Par conséquent, un serveur API Kubernetes qui n'est pas correctement configuré avec le bon ensemble de contrôleurs d'admission est un serveur incomplet et ne prendra
+pas en charge toutes les fonctionnalités que vous attendez.
+Comment activer un contrôleur d'admission 
+
+TP
+
+-Which admission controller is not enabled by default?
+re: Check enable-admission-plugins in kube-apiserver help options
+$kubectl exec -it kube-apiserver-controlplane -n kube-system -- kube-apiserver -h | grep 'enable-admission-plugins'
+
+-Which admission controller is enabled in this cluster which is normally disabled?
+re:
+$ grep enable-admission-plugins /etc/kubernetes/manifests/kube-apiserver.yaml
+
+-Try to create nginx pod in the blue namespace. The blue namespace does not already exist. Dont create the blue namespace yet.
+re-Run below command to deploy a pod with the nginx image in the blue namespace
+$ kubectl run nginx --image=nginx -n blue
+
+-The previous step failed because kubernetes have NamespaceExists admission controller enabled which rejects requests to namespaces that do not exist. 
+So, to create a namespace that does not exist automatically, we could enable the NamespaceAutoProvision admission controller
+Enable the NamespaceAutoProvision admission controller
+Note: Once you update kube-apiserver yaml file, please wait for a few minutes for the kube-apiserver to restart completely.
+re: Edit /etc/kubernetes/manifests/kube-apiserver.yaml and add NamespaceAutoProvision admission controller to --enable-admission-plugins list
+Add NamespaceAutoProvision admission controller to --enable-admission-plugins list to /etc/kubernetes/manifests/kube-apiserver.yaml It should look like below
+ - --enable-admission-plugins=NodeRestriction,NamespaceAutoProvision
+ API server will automatically restart and pickup this configuration.
+ 
+-Now, let's run the nginx pod in blue namespace and check if it succeeds.
+Pod image: nginx
+re:Run the below command to deploy single pod with nginx image in blue namespace
+kubectl run nginx --image nginx -n blue
+
+-Note that the NamespaceExists and NamespaceAutoProvision admission controllers are deprecated and now replaced by NamespaceLifecycle admission controller.
+The NamespaceLifecycle admission controller will make sure that requests to a non-existent namespace is rejected and that the default namespaces such as default, 
+kube-system and kube-public cannot be deleted.
+
+-Désactiver le contrôleur d'admission DefaultStorageClass
+Ce contrôleur d'admission observe la création des objets PersistentVolumeClaim qui ne demandent pas de classe de stockage spécifique et
+leur ajoute automatiquement une classe de stockage par défaut. De cette façon, les utilisateurs qui ne demandent pas de classe de stockage particulière 
+n'ont pas à s'en préoccuper du tout et ils obtiendront celle par défaut.
+re: Update /etc/kubernetes/manifests/kube-apiserver.yaml as below
+   - --disable-admission-plugins=DefaultStorageClass
+   
+-can check the process to see enabled and disabled plugins.
+re: ps -ef | grep kube-apiserver | grep admission-plugins
+   
+   
+
+
